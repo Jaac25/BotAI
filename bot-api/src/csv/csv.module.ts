@@ -1,7 +1,6 @@
-import { Global, Module } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { CsvService } from './csv.service';
 
-@Global()
 @Module({
   providers: [CsvService],
   exports: [CsvService],

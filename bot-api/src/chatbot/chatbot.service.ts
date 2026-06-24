@@ -1,17 +1,22 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
-  ChatCompletionCreateParamsStreaming,
   ChatCompletionMessageParam,
+  ChatCompletionTool,
 } from 'openai/resources';
 import { LLMService } from './llm.service';
-import { SearchProductsTool } from './tools/search-products.tool';
-import { ConvertCurrenciesTool } from './tools/convert-currencies.tool';
-import { CsvService } from '../csv/csv.service';
+import {
+  ConvertCurrenciesTool,
+  convertCurrenciesToolPrompt,
+} from './tools/convert-currencies.tool';
+import {
+  SearchProductsTool,
+  searchProductToolPrompt,
+} from './tools/search-products.tool';
 
 interface ITool {
   type: 'function';
-  index: 0;
+  index: number;
   id: string;
   function: {
     name: string;
@@ -22,11 +27,11 @@ interface ITool {
 @Injectable()
 export class ChatbotService {
   readonly model = 'gpt-4o-mini';
-  private readonly logger = new Logger(ChatbotService.name);
-  private csvService = new CsvService();
 
   constructor(
     private readonly llm: LLMService,
+    private readonly searchProductsTool: SearchProductsTool,
+    private readonly convertCurrenciesTool: ConvertCurrenciesTool,
     private readonly configService: ConfigService,
   ) {
     this.model = this.configService.get('LLM_MODEL') || this.model;
@@ -34,45 +39,11 @@ export class ChatbotService {
 
   async chat(message: string) {
     try {
-      const tools: ChatCompletionCreateParamsStreaming['tools'] = [
-        {
-          type: 'function',
-          function: {
-            name: 'searchProducts',
-            description: 'Search products from csv',
-            parameters: {
-              type: 'object',
-              properties: {
-                query: {
-                  type: 'string',
-                },
-              },
-              required: ['query'],
-            },
-          },
-        },
-        {
-          type: 'function',
-          function: {
-            name: 'convertCurrencies',
-            description: 'Convert between currencies',
-            parameters: {
-              type: 'object',
-              properties: {
-                amount: {
-                  type: 'number',
-                },
-                from: {
-                  type: 'string',
-                },
-                to: {
-                  type: 'string',
-                },
-              },
-              required: ['amount', 'from', 'to'],
-            },
-          },
-        },
+      const MAX_ATTEMPTS = this.configService.get<number>('MAX_ATTEMPS') ?? 15;
+
+      const tools: ChatCompletionTool[] = [
+        searchProductToolPrompt,
+        convertCurrenciesToolPrompt,
       ];
 
       const messages: ChatCompletionMessageParam[] = [
@@ -82,79 +53,65 @@ export class ChatbotService {
         },
       ];
 
-      const response = await this.llm.client.chat.completions.create({
-        model: this.model,
-        messages,
-        tools,
-      });
+      let attempt = 0;
+      while (attempt < MAX_ATTEMPTS) {
+        const response = await this.llm.client.chat.completions.create({
+          model: this.model,
+          messages,
+          tools,
+        });
 
-      const toolCall = response?.choices
-        ?.at(0)
-        ?.message?.tool_calls?.at(0) as ITool;
+        const assistantMessage = response.choices?.at(0)?.message;
 
-      if (!toolCall) {
-        return response.choices[0].message.content;
-      }
-
-      let toolResult;
-
-      this.logger.log(
-        { toolCall },
-        '===============================================',
-      );
-      switch (toolCall?.function.name) {
-        case 'searchProducts': {
-          const args: Record<string, unknown> = JSON.parse(
-            toolCall.function.arguments,
-          ) as Record<string, unknown>;
-
-          const tool = new SearchProductsTool(this.csvService);
-          toolResult = await tool.execute(args.query as string);
-
-          break;
+        if (!assistantMessage?.tool_calls?.length) {
+          return assistantMessage?.content ?? 'No se encontró información';
         }
 
-        case 'convertCurrencies': {
-          const args: Record<string, unknown> = JSON.parse(
-            toolCall.function.arguments,
-          ) as Record<string, unknown>;
+        messages.push(assistantMessage);
 
-          const tool = new ConvertCurrenciesTool(this.csvService);
-          toolResult = await tool.execute(
-            args.amount as number,
-            args.from as string,
-            args.to as string,
-          );
+        for (const toolCall of assistantMessage.tool_calls as ITool[]) {
+          const result = await this.executeTool(toolCall);
 
-          break;
+          messages.push({
+            role: 'tool',
+            tool_call_id: toolCall.id,
+            content: JSON.stringify(result),
+          });
         }
+        attempt++;
       }
-
-      messages.push(response.choices[0].message);
-
-      messages.push({
-        role: 'tool',
-        tool_call_id: toolCall.id,
-        content: JSON.stringify(toolResult),
-      });
-
-      messages.push(response.choices[0].message);
-
-      messages.push({
-        role: 'tool',
-        tool_call_id: toolCall.id,
-        content: JSON.stringify(toolResult),
-      });
-
-      const finalResponse = await this.llm.client.chat.completions.create({
-        model: this.model,
-        messages,
-      });
-
-      return finalResponse.choices[0].message.content;
     } catch (error) {
       console.error('Error in chat method:', error);
       throw error;
     }
   }
+
+  executeTool = async (toolCall: ITool) => {
+    try {
+      const args: Record<string, string> = JSON.parse(
+        toolCall.function.arguments,
+      ) as Record<string, string>;
+
+      switch (toolCall?.function.name) {
+        case 'searchProducts':
+          if (!args.query)
+            return 'No query provided. Please provide a search term to find products.';
+
+          return this.searchProductsTool.execute({ query: args.query });
+
+        case 'convertCurrencies':
+          return this.convertCurrenciesTool.execute({
+            amount: Number(args.amount),
+            from: args.from,
+            to: args.to,
+          });
+
+        default:
+          throw new Error(`Unknown tool: ${toolCall.function.name}`);
+      }
+    } catch (error) {
+      console.error('Tools error:', error);
+      throw error;
+    }
+  };
 }
