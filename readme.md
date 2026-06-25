@@ -19,11 +19,39 @@ pnpm install
 pnpm run start:dev
 ```
 
+### Variables de entorno
+
+La carpeta bot-api debe tener un .env con las siguientes variables de entorno:
+
+```
+# Puerto donde correrá la API (por defecto 3000)
+PORT=3001
+
+# Keys y configuración para LLM
+LLM_API_KEY=
+LLM_BASE_URL="https://openrouter.ai/api/v1"
+LLM_MODEL="openrouter/owl-alpha"
+MAX_ATTEMPS=10
+
+# APP_ID para openexchangerates
+CURRENCY_API_KEY=
+
+```
+
 2. Abre otra terminal en la carpeta `front` y ejecuta:
 
 ```bash
 pnpm install
 pnpm run dev
+```
+
+### Variables de entorno
+
+La carpeta front debe tener un .env con las siguientes variables de entorno:
+
+```
+# Host a donde apuntará:
+NEXT_PUBLIC_HOST=http://localhost:2525
 ```
 
 3. Abre el navegador en `http://localhost:3000`.
@@ -39,3 +67,11 @@ pnpm run dev
 - Si ejecutas ambos localmente, usa `PORT=3001` para `bot-api`.
 
 ## ChatBot Desplegado: https://bot-ai-inky.vercel.app/
+
+## Adicionales:
+
+- Interface hecha en react, nextJS y tailwind.
+- Despliegue de la plataforma tanto de la api como del front.
+- Prompts para limitar las respuestas del chatbot y reducir las alucinaciones.
+- Prompts para darle una especialidad y contexto al chatbot.
+- Límite de intentos para evitar un consumo infinito con el LLM por si hay solicitudes ambiguas.
