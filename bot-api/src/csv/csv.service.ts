@@ -3,6 +3,7 @@ import {
   InternalServerErrorException,
   Logger,
 } from '@nestjs/common';
+import { AxiosError } from 'axios';
 import csvParser from 'csv-parser';
 import { createReadStream } from 'fs';
 import { join } from 'path';
@@ -12,6 +13,7 @@ export class CsvService {
   private readonly logger = new Logger(CsvService.name);
   async read<T = Record<string, string>>(fileName: string): Promise<T[]> {
     try {
+      // The csv file is read and provides the rows list
       return new Promise((resolve, reject) => {
         const path = join(process.cwd(), 'src', 'data', fileName);
 
@@ -33,8 +35,11 @@ export class CsvService {
           );
       });
     } catch (error) {
-      this.logger.error(`Error reading CSV file "${fileName}": ${error}`);
-      return [] as T[];
+      const axiosError = error as AxiosError;
+      this.logger.error(
+        `Error reading CSV file: "${fileName}": ${axiosError.message}`,
+      );
+      return [];
     }
   }
 }

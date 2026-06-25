@@ -13,6 +13,7 @@ import {
   SearchProductsTool,
   searchProductToolPrompt,
 } from './tools/search-products.tool';
+import { AxiosError } from 'axios';
 
 interface ITool {
   type: 'function';
@@ -54,7 +55,11 @@ export class ChatbotService {
       ];
 
       let attempt = 0;
+      // We need to limit attempts to use LLM to avoid infinite loops due to inconsistent user requests,
+      // and a while loop is mandatory to mix tools because there are cases where we need the response
+      // from one tool to get the value from another tool.
       while (attempt < MAX_ATTEMPTS) {
+        // The connection is established and the messages list is sent to the LLM.
         const response = await this.llm.client.chat.completions.create({
           model: this.model,
           messages,
@@ -63,15 +68,20 @@ export class ChatbotService {
 
         const assistantMessage = response.choices?.at(0)?.message;
 
+        // The while loop will end when the LLM not longer needs any more tools
         if (!assistantMessage?.tool_calls?.length) {
           return assistantMessage?.content ?? 'No se encontró información';
         }
 
+        // The assistant message is added to the messages list
         messages.push(assistantMessage);
 
+        // The tools are executed depending from the LLM response
         for (const toolCall of assistantMessage.tool_calls as ITool[]) {
+          // The LLM choose the tool
           const result = await this.executeTool(toolCall);
 
+          // The tool's response is added to the message list so that LLM has context.
           messages.push({
             role: 'tool',
             tool_call_id: toolCall.id,
@@ -80,9 +90,9 @@ export class ChatbotService {
         }
         attempt++;
       }
-    } catch (error) {
-      console.error('Error in chat method:', error);
-      throw error;
+    } catch (error: unknown) {
+      const err = error as AxiosError;
+      throw new Error(`Error in chat method ${err.message}`);
     }
   }
 
@@ -110,8 +120,8 @@ export class ChatbotService {
           throw new Error(`Unknown tool: ${toolCall.function.name}`);
       }
     } catch (error) {
-      console.error('Tools error:', error);
-      throw error;
+      const err = error as AxiosError;
+      throw new Error(`Tools error: ${err.response?.status ?? ''}`);
     }
   };
 }

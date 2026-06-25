@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ChatCompletionTool } from 'openai/resources';
 import { IProduct } from '../../core/types/products';
 import { CsvService } from '../../csv/csv.service';
+import { AxiosError } from 'axios';
 
 @Injectable()
 export class SearchProductsTool {
@@ -11,16 +12,20 @@ export class SearchProductsTool {
 
   async execute({ query }: { query: string }): Promise<IProduct[]> {
     try {
+      //The products list csv is read
       const products =
         await this.csvService.read<IProduct>('products_list.csv');
 
+      //The product list is filter by the query
       const productsFiltered = products.filter((product) =>
         JSON.stringify(product).toLowerCase().includes(query.toLowerCase()),
       );
 
+      // Only the first two items on the list are provided.
       return productsFiltered.slice(0, 2);
     } catch (error) {
-      this.logger.error(`Error searching products: ${error}`);
+      const axiosError = error as AxiosError;
+      this.logger.error(`Error searching products: ${axiosError.message}`);
       return [];
     }
   }

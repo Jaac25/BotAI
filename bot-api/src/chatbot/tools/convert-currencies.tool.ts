@@ -15,19 +15,34 @@ export class ConvertCurrenciesTool {
     from?: string;
     to?: string;
   }): Promise<number> {
-    if (!to) {
-      throw new Error('The "to" currency is required.');
-    }
-    if (!amount) {
-      throw new Error('The "amount" is required.');
-    }
+    try {
+      if (!to) {
+        throw new Error('The "to" currency is required.');
+      }
+      if (!amount) {
+        throw new Error('The "amount" is required.');
+      }
 
-    const currencies = await this.currenciesService.getCurrencies(from);
-    const rate = currencies.rates[to.toUpperCase()];
-    if (!rate) {
-      throw new Error(`Exchange rate for "${to}" is not available.`);
+      // The currencies are get from openexchangerates.org
+      const currencies = await this.currenciesService.getCurrencies(from);
+
+      // The currency value is got
+      const rate = currencies?.rates[to.toUpperCase()];
+      if (!rate) {
+        throw new Error(`Exchange rate for "${to}" is not available.`);
+      }
+      // The value is converted to the destination currency.
+      return amount * rate;
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : typeof error === 'object' && error !== null
+            ? JSON.stringify(error)
+            : String(error);
+
+      throw new Error(`ConvertCurrenciesTool error: ${message}`);
     }
-    return amount * rate;
   }
 }
 

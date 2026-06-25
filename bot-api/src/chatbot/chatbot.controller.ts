@@ -1,4 +1,9 @@
-import { Body, Controller, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  InternalServerErrorException,
+  Post,
+} from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ChatbotDto } from './chatbot.dto';
 import { ChatbotService } from './chatbot.service';
@@ -14,10 +19,17 @@ export class ChatbotController {
     description: 'Send a text to chatbot and get the response',
   })
   async chat(@Body() dto: ChatbotDto) {
-    const response = await this.chatbotService.chat(dto.message);
-
-    return {
-      response,
-    };
+    try {
+      const response = await this.chatbotService.chat(dto.message);
+      return {
+        response,
+      };
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : JSON.stringify(error);
+      throw new InternalServerErrorException(
+        message || 'Unexpected server error',
+      );
+    }
   }
 }
