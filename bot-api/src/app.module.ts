@@ -1,16 +1,13 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { ChatbotController } from './chatbot/chatbot.controller';
-import { ChatbotService } from './chatbot/chatbot.service';
-import { LLMService } from './chatbot/llm.service';
+import { ChatbotModule } from './chatbot/chatbot.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
     }),
+    ChatbotModule,
   ],
-  controllers: [ChatbotController],
-  providers: [ChatbotService, LLMService],
 })
 export class AppModule {}
