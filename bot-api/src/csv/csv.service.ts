@@ -15,7 +15,7 @@ export class CsvService {
     try {
       // The csv file is read and provides the rows list
       return new Promise((resolve, reject) => {
-        const path = join(process.cwd(), 'src', 'data', fileName);
+        const path = join(process.cwd(), 'data', fileName);
 
         const rows: T[] = [];
 
