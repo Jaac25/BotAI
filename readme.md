@@ -67,3 +67,11 @@ NEXT_PUBLIC_HOST=http://localhost:2525
 - Si ejecutas ambos localmente, usa `PORT=3001` para `bot-api`.
 
 ## ChatBot Desplegado: https://bot-ai-inky.vercel.app/
+
+## Adicionales:
+
+- Interface hecha en react, nextJS y tailwind.
+- Despliegue de la plataforma tanto de la api como del front.
+- Prompts para limitar las respuestas del chatbot y reducir las alucinaciones.
+- Prompts para darle una especialidad y contexto al chatbot.
+- Límite de intentos para evitar un consumo infinito con el LLM por si hay solicitudes ambiguas.
